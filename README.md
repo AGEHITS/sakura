@@ -134,8 +134,7 @@ gcloud scheduler jobs create http send-line-message \
     --schedule="* * * * *" \
     --uri "https://xxxxxxxxx/send_random_message" \
     --http-method POST \
-    --location=asia-northeast1 \
-    --oidc-service-account-email="yyyyy@zzzzzz.com"
+    --location=asia-northeast1
 ```
 
 5.Webhook URLの確認
