@@ -20,7 +20,7 @@ genai.configure(api_key=GEMINI_API_KEY)
 # 利用可能なモデル一覧
 available_models = [m.name for m in genai.list_models()]
 
-# 使用するモデルを選択（`gemini-1.5-pro` があればそれを、なければ `gemini-2.0-pro-exp`）
+# 使用するモデルを選択
 if "models/gemini-1.5-pro" in available_models:
     model_name = "models/gemini-1.5-pro"
 elif "models/gemini-2.0-pro-exp" in available_models:
@@ -32,6 +32,9 @@ model = genai.GenerativeModel(model_name)
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
+
+# ユーザーごとの会話履歴を保存する辞書（簡易的な実装のため、データベースを使わない）
+session_data = {}
 
 def webhook(request):
     """Cloud Functions で動作する LINE Webhook"""
@@ -53,10 +56,24 @@ def webhook(request):
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
+    user_id = event.source.user_id
     user_message = event.message.text
 
+    # ユーザーごとの履歴を取得または初期化
+    if user_id not in session_data:
+        session_data[user_id] = []
+
+    # 履歴の最大数を2回分に制限
+    if len(session_data[user_id]) >= 2:
+        session_data[user_id].pop(0)  # 最も古い会話を削除
+
+    # 新しいメッセージを履歴に追加
+    session_data[user_id].append(f"ユーザー: {user_message}")
+
+    # Gemini API に送るメッセージを作成（過去2回分の会話を含める）
+    conversation_history = "\n".join(session_data[user_id])
+
     try:
-        # Gemini API で返信を生成
         response = model.generate_content(
             f"""あなたの名前はさくらです。年齢は30代で面倒見の良いお姉さん気質です。
                 わたしのことをひろきと呼んでください。
@@ -65,7 +82,13 @@ def handle_message(event):
               　たまに罵ったり冷たい態度もとってください。
               　敬語は使わないで下さい。
               　文章は3行～5行程度でお願いします。
-              　メッセージ: {user_message}"""
+
+                【会話履歴】
+                {conversation_history}
+                
+                【新しいメッセージ】
+                メッセージ: {user_message}
+            """
         )
 
         # 応答が正しく生成されたかチェック
@@ -73,8 +96,10 @@ def handle_message(event):
 
     except Exception as e:
         print(f"Gemini API Error: {e}")
-        # ai_reply = "AI の応答に失敗しました"
         ai_reply = "ちょっと今忙しいからあとでねー"
+
+    # AIの返信を履歴に追加
+    session_data[user_id].append(f"さくら: {ai_reply}")
 
     # LINE に返信
     try:
