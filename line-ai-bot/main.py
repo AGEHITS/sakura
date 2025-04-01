@@ -106,6 +106,27 @@ def handle_message(event):
 
 # Cloud Functions のエントリポイント（Cloud Scheduler 用）
 def send_random_message(request):
+
+    # 現在の日本時間を取得
+    now = datetime.now()
+    japan_time = now.astimezone(timezone('Asia/Tokyo'))
+
+    chance = random.randint(1, 100)  # 1から100の間でランダムな整数
+
+    # 現在時間によりLINE送信要否の抽選を行う
+    if japan_time.hour in [9, 12, 15, 17, 20, 23]:
+        if chance > 80:
+            return "Not sending message this time", 200
+    elif japan_time.hour in range(0, 8):
+        return "Not sending message this time", 200
+    else:
+        if chance > 10:
+            return "Not sending message this time", 200
+
+    # ランダムに0分から59分で待機
+    sleep_seconds = random.randint(0, 59) * 60 
+    time.sleep(sleep_seconds)
+    
     """Cloud Scheduler から呼ばれてランダムメッセージを送信"""
     messages = [
         "ねぇ、今何してるの？",
