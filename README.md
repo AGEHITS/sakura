@@ -9,6 +9,7 @@ LINEでメッセージを送るとAIが返信してくれる仕組みの作成
 | ---- | ---- |
 | 1.0 | 初期開発 |
 | 1.1 | 仕様追加（過去2往復分の会話を踏まえて返信） |
+| 1.2 | 仕様追加（AI側からLINE送信） |
 
 
 ## 技術スタック
@@ -17,6 +18,7 @@ LINEでメッセージを送るとAIが返信してくれる仕組みの作成
 - Google Gemini API
 - Webhook対応のサーバー（Google Cloud Functions）  
   ※月間100万回の無料呼び出しと、月間360,000 GB-秒の無料コンピューティングタイムあり
+- gcloud scheduler（cron的な仕組み）
 
 ## プログラム
 | プログラム名 | 説明 |
@@ -103,6 +105,8 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 4.デプロイコマンド
 ```
 cd line-ai-bot
+# AIが返信（webhook）
+# デプロイ
 gcloud functions deploy line_webhook \
     --runtime python39 \
     --trigger-http \
@@ -112,6 +116,26 @@ gcloud functions deploy line_webhook \
     --memory 256MB \
     --timeout 60s \
     --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc
+
+# AIが送信（send_random_message）
+# デプロイ
+gcloud functions deploy send_random_message \
+    --runtime python39 \
+    --trigger-http \
+    --allow-unauthenticated \
+    --source . \
+    --entry-point send_random_message \
+    --memory 256MB \
+    --timeout 60s \
+        --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc,USER_ID=dddddd
+
+# スケジュール登録
+gcloud scheduler jobs create http send-line-message \
+    --schedule="* * * * *" \
+    --uri "https://xxxxxxxxx/send_random_message" \
+    --http-method POST \
+    --location=asia-northeast1 \
+    --oidc-service-account-email="yyyyy@zzzzzz.com"
 ```
 
 5.Webhook URLの確認
@@ -125,4 +149,13 @@ gcloud functions logs read line_webhook
 7.再接続時
 ```
 gcloud auth login
+```
+8.スケジューラ関連
+```
+# ジョブリスト参照
+gcloud scheduler jobs list --location=asia-northeast1
+# ジョブ実行ログ
+gcloud scheduler jobs describe send-line-message --location=asia-northeast1
+# ジョブ削除
+gcloud scheduler jobs delete send-line-message --location=asia-northeast1
 ```
