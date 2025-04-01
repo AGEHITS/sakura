@@ -1,0 +1,7 @@
+functions-framework
+flask
+requests
+google-cloud-secret-manager
+google-generativeai
+gunicorn
+line-bot-sdk
