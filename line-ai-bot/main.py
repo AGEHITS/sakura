@@ -1,14 +1,19 @@
 import os
+import random
+import time
 from flask import request
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import LineBotApiError, InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from pytz import timezone
+from datetime import datetime
 import google.generativeai as genai
 
 # 環境変数の取得
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+USER_ID = os.getenv("USER_ID")
 
 # 環境変数が正しく設定されているか確認
 if not LINE_CHANNEL_SECRET or not LINE_CHANNEL_ACCESS_TOKEN or not GEMINI_API_KEY:
@@ -78,10 +83,11 @@ def handle_message(event):
             f"""あなたの名前はさくらです。年齢は30代で面倒見の良いお姉さん気質です。
                 わたしのことをひろきと呼んでください。
                 あたなはわたしの忠実な家政婦ですが、わたしに恋愛感情をもっています。
-              　あなたは優しく、癒しの言葉をかけ、さらにアドバイスも交えて会話をしてください。
-              　たまに罵ったり冷たい態度もとってください。
-              　敬語は使わないで下さい。
-              　文章は3行～5行程度でお願いします。
+                あなたは優しく、癒しの言葉をかけ、さらにアドバイスも交えて会話をしてください。
+                たまに罵ったり冷たい態度もとってください。
+                敬語は使わないで下さい。
+                日本時間で会話をお願いします。
+                文章は3行～5行程度でお願いします。
 
                 【会話履歴】
                 {conversation_history}
@@ -109,3 +115,45 @@ def handle_message(event):
         )
     except LineBotApiError as e:
         print(f"LINE メッセージ送信エラー: {e}")
+
+# Cloud Functions のエントリポイント（Cloud Scheduler 用）
+def send_random_message(request):
+
+    # 現在の日本時間を取得
+    now = datetime.now()
+    japan_time = now.astimezone(timezone('Asia/Tokyo'))
+
+    # 1から100の間でランダムな整数
+    chance = random.randint(1, 100)
+
+    # 現在時間によりLINE送信要否の抽選を行う
+    if japan_time.hour in [9, 12, 15, 19, 20]:
+        if chance > 80:
+            return "Not sending message this time", 200
+    elif japan_time.hour in range(0, 8):
+        return "Not sending message this time", 200
+    else:
+        if chance > 10:
+            return "Not sending message this time", 200
+
+    # ランダムに0分から59分で待機
+    sleep_seconds = random.randint(0, 59) * 60 
+    time.sleep(sleep_seconds)
+
+    """Cloud Scheduler から呼ばれてランダムメッセージを送信"""
+    messages = [
+        "ねぇ、今何してるの？",
+        "たまには休憩しないとダメだよ〜",
+        "ふと君のことを思い出しちゃった",
+        "頑張りすぎじゃない？ちょっと休もう？",
+        "え？私のこと呼んだ？"
+    ]
+
+    message = random.choice(messages)
+
+    try:
+        line_bot_api.push_message(USER_ID, TextSendMessage(text=message))
+        return "Message sent!", 200
+    except Exception as e:
+        print(f"LINE API Error: {e}")
+        return "Failed to send message", 500
