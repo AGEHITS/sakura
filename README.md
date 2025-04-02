@@ -120,18 +120,20 @@ gcloud functions deploy line_webhook \
 # AIが送信（send_random_message）
 # デプロイ
 gcloud functions deploy send_random_message \
+    --gen2 \
     --runtime python39 \
     --trigger-http \
     --allow-unauthenticated \
     --source . \
     --entry-point send_random_message \
     --memory 256MB \
-    --timeout 60s \
-        --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc,USER_ID=dddddd
+    --timeout=3600 \
+    --region asia-northeast1 \
+    --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc,USER_ID=dddddd
 
 # スケジュール登録
 gcloud scheduler jobs create http send-line-message \
-    --schedule="* * * * *" \
+    --schedule="0 * * * *" \
     --uri "https://xxxxxxxxx/send_random_message" \
     --http-method POST \
     --location=asia-northeast1
