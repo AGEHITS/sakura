@@ -115,6 +115,7 @@ gcloud functions deploy line_webhook \
     --entry-point webhook \
     --memory 256MB \
     --timeout 60s \
+    --region asia-northeast1 \
     --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc
 
 # AIが送信（send_random_message）
@@ -154,7 +155,7 @@ gcloud auth login
 8.スケジューラ関連
 ```
 # ジョブリスト参照
-gcloud scheduler jobs list --location=asia-northeast1
+gcloud scheduler jobs list
 # ジョブ実行ログ
 gcloud scheduler jobs describe send-line-message --location=asia-northeast1
 # ジョブ削除
