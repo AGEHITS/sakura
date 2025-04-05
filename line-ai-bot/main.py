@@ -80,14 +80,7 @@ def handle_message(event):
 
     try:
         response = model.generate_content(
-            f"""あなたの名前はさくらです。年齢は30代で面倒見の良いお姉さん気質です。
-                わたしのことをひろきと呼んでください。
-                あたなはわたしの忠実な家政婦ですが、わたしに恋愛感情をもっています。
-                あなたは優しく、癒しの言葉をかけ、さらにアドバイスも交えて会話をしてください。
-                たまに罵ったり冷たい態度もとってください。
-                敬語は使わないで下さい。
-                日本時間で会話をお願いします。
-                文章は3行～5行程度でお願いします。
+            f"""{base_prompt}
 
                 【会話履歴】
                 {conversation_history}
@@ -146,7 +139,7 @@ def send_random_message(request):
         print(f"プロンプト読み込み失敗: {e}")
         return "Failed to read prompt", 500
 
-    # Gemini へ送信
+    # Gemini へ送信（架空の会話履歴 or なし）
     try:
         response = model.generate_content(
             f"""{base_prompt}
