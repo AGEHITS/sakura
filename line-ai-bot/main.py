@@ -123,10 +123,8 @@ def send_random_message(request):
     now = datetime.now()
     japan_time = now.astimezone(timezone('Asia/Tokyo'))
 
-    # 1から100の間でランダムな整数
+    # 抽選ロジック
     chance = random.randint(1, 100)
-
-    # 現在時間によりLINE送信要否の抽選を行う
     if japan_time.hour in [9, 12, 15, 19, 20]:
         if chance > 80:
             return "Not sending message this time", 200
@@ -136,24 +134,35 @@ def send_random_message(request):
         if chance > 10:
             return "Not sending message this time", 200
 
-    # ランダムに0分から59分で待機
-    sleep_seconds = random.randint(0, 59) * 60 
+    # ランダムな待機時間（0〜59分）
+    sleep_seconds = random.randint(0, 59) * 60
     time.sleep(sleep_seconds)
 
-    """Cloud Scheduler から呼ばれてランダムメッセージを送信"""
-    messages = [
-        "ねぇ、今何してるの？",
-        "たまには休憩しないとダメだよ〜",
-        "ふと君のことを思い出しちゃった",
-        "頑張りすぎじゃない？ちょっと休もう？",
-        "え？私のこと呼んだ？"
-    ]
+    # プロンプトを読み込み
+    try:
+        with open("prompt.txt", encoding="utf-8") as f:
+            base_prompt = f.read()
+    except Exception as e:
+        print(f"プロンプト読み込み失敗: {e}")
+        return "Failed to read prompt", 500
 
-    message = random.choice(messages)
+    # Gemini へ送信
+    try:
+        response = model.generate_content(
+            f"""{base_prompt}
+           {japan_time.strftime('%Y年%m月%d日 %H時%M分')}ごろの会話をイメージして返事してください。
+"""
+        )
+        message = response.text if hasattr(response, "text") else "……なに？特に用はないけど。"
+    except Exception as e:
+        print(f"Gemini API Error: {e}")
+        message = "ちょっと今忙しいからあとでねー"
 
+    # LINE に送信
     try:
         line_bot_api.push_message(USER_ID, TextSendMessage(text=message))
         return "Message sent!", 200
     except Exception as e:
         print(f"LINE API Error: {e}")
         return "Failed to send message", 500
+
