@@ -61,6 +61,15 @@ def webhook(request):
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
+
+    # プロンプトを読み込み
+    try:
+        with open("prompt.txt", encoding="utf-8") as f:
+            base_prompt = f.read()
+    except Exception as e:
+        print(f"プロンプト読み込み失敗: {e}")
+        return "Failed to read prompt", 500
+
     user_id = event.source.user_id
     user_message = event.message.text
 
