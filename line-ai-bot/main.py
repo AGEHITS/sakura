@@ -90,6 +90,8 @@ def handle_message(event):
     try:
         response = model.generate_content(
             f"""{base_prompt}
+                わたしは夫婦仲が悪く悩んでいます。
+                文章は90文字以内でお願いします。
 
                 【会話履歴】
                 {conversation_history}
@@ -153,6 +155,7 @@ def send_random_message(request):
         response = model.generate_content(
             f"""{base_prompt}
            {japan_time.strftime('%Y年%m月%d日 %H時%M分')}ごろの会話をイメージして返事してください。
+           文章は40文字以内でお願いします。
 """
         )
         message = response.text if hasattr(response, "text") else "……なに？特に用はないけど。"
@@ -167,4 +170,3 @@ def send_random_message(request):
     except Exception as e:
         print(f"LINE API Error: {e}")
         return "Failed to send message", 500
-
