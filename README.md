@@ -32,7 +32,8 @@ LINEでメッセージを送るとAIが返信してくれる仕組みの作成
 1. 準備
 
 - LINE Developersコンソールでチャンネルを作成
-- Google Cloud Consoleでプロジェクトを作成（https://console.cloud.google.com/）
+- Google Cloud Consoleでプロジェクトを作成
+  https://console.cloud.google.com/
 - APIの有効化
   - Cloud Functions API
   - Cloud Build API
