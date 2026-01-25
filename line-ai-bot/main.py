@@ -24,14 +24,10 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 # 利用可能なモデル一覧
 available_models = [m.name for m in genai.list_models()]
+print(available_models)
 
 # 使用するモデルを選択
-if "models/gemini-1.5-pro" in available_models:
-    model_name = "models/gemini-1.5-pro"
-elif "models/gemini-2.0-pro-exp" in available_models:
-    model_name = "models/gemini-2.0-pro-exp"
-else:
-    raise ValueError(f"使用可能な適切なモデルが見つかりません: {available_models}")
+model_name = "models/gemini-2.5-flash"
 
 model = genai.GenerativeModel(model_name)
 
