@@ -23,8 +23,8 @@ if not LINE_CHANNEL_SECRET or not LINE_CHANNEL_ACCESS_TOKEN or not GEMINI_API_KE
 genai.configure(api_key=GEMINI_API_KEY)
 
 # 利用可能なモデル一覧
-available_models = [m.name for m in genai.list_models()]
-print(available_models)
+# available_models = [m.name for m in genai.list_models()]
+# print(available_models)
 
 # 使用するモデルを選択
 model_name = "models/gemini-2.5-flash"
