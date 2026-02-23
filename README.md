@@ -151,7 +151,13 @@ gcloud functions deploy send_message_task \
     --region asia-northeast1 \
     --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc,USER_ID=dddddd
 
-# スケジュール登録
+# Cloud Tasks のキュー作成（初回のみ）
+## キュー作成
+gcloud tasks queues create line-message-queue \
+  --location=asia-northeast1
+
+# スケジュール登録（初回のみ）
+## スケジュール登録
 gcloud scheduler jobs create http send-line-message \
     --schedule="0 * * * *" \
     --uri "https://xxxxxxxxx/send_random_message" \
@@ -165,26 +171,25 @@ gcloud functions describe line_webhook
 ```
 6.ログの確認
 ```
-gcloud functions logs read line_webhook
+gcloud functions logs read line_webhook --location=asia-northeast1
 ```
 7.再接続時
 ```
 gcloud auth login
 ```
-8.Cloud Tasks のキュー作成（初回のみ）
-```
-# キュー作成
-gcloud tasks queues create line-message-queue \
-  --location=asia-northeast1
-# 作成後の確認
-gcloud tasks queues list --location=asia-northeast1
-```
-9.スケジューラ関連
+8.スケジューラ関連
 ```
 # ジョブリスト参照
 gcloud scheduler jobs list
+# ジョブの手動実行
+gcloud scheduler jobs run send-line-message --location=asia-northeast1
 # ジョブ実行ログ
 gcloud scheduler jobs describe send-line-message --location=asia-northeast1
 # ジョブ削除
 gcloud scheduler jobs delete send-line-message --location=asia-northeast1
+```
+9.gcloud task関連
+```
+## taskの確認
+gcloud tasks queues list --location=asia-northeast1
 ```
