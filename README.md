@@ -21,12 +21,19 @@ LINEでメッセージを送るとAIが返信してくれる仕組みの作成
 - gcloud scheduler（cron的な仕組み）
 
 ## プログラム
+### プログラム一覧
 | プログラム名 | 説明 |
 | ---- | ---- |
 | main.py | メインプログラム |
 | geminiapi_ver.py | geminiapiの利用可能バージョンを確認可能なプログラム |
 | secret_setup.py | secretを保管するプログラム（現在動かない） |
 
+### 機能一覧
+| 機能名 | 実行契機 | 説明 |
+| ---- | ---- | ---- |
+| line_webhook | こちらからのLINE送信時 | LINE返信機能 |
+| send_random_message | Cloud Scheduler（毎時） | LINE送信判定機能（送信要否を抽選し、Cloud Tasksにn分後に送信依頼 |
+| send_message_task | Cloud Tasks | LINE送信機能 |
 
 ## 開発ステップ
 1. 準備
@@ -106,8 +113,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 4.デプロイコマンド
 ```
 cd line-ai-bot
-# AIが返信（webhook）
-# デプロイ
+# line_webhook（AIが返信）
 gcloud functions deploy line_webhook \
     --runtime python39 \
     --trigger-http \
@@ -119,8 +125,7 @@ gcloud functions deploy line_webhook \
     --region asia-northeast1 \
     --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc
 
-# AIが送信（send_random_message）
-# デプロイ
+# send_random_message（AIから送信判断）
 gcloud functions deploy send_random_message \
     --gen2 \
     --runtime python39 \
@@ -128,6 +133,20 @@ gcloud functions deploy send_random_message \
     --allow-unauthenticated \
     --source . \
     --entry-point send_random_message \
+    --memory 256MB \
+    --timeout=3600 \
+    --region asia-northeast1 \
+    --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc,USER_ID=dddddd
+
+# send_message_task（AIから送信実行）
+# ※send_random_messageから呼び出し
+gcloud functions deploy send_message_task \
+    --gen2 \
+    --runtime python39 \
+    --trigger-http \
+    --allow-unauthenticated \
+    --source . \
+    --entry-point send_message_task \
     --memory 256MB \
     --timeout=3600 \
     --region asia-northeast1 \
@@ -153,7 +172,15 @@ gcloud functions logs read line_webhook
 ```
 gcloud auth login
 ```
-8.スケジューラ関連
+8.Cloud Tasks のキュー作成（初回のみ）
+```
+# キュー作成
+gcloud tasks queues create line-message-queue \
+  --location=asia-northeast1
+# 作成後の確認
+gcloud tasks queues list --location=asia-northeast1
+```
+9.スケジューラ関連
 ```
 # ジョブリスト参照
 gcloud scheduler jobs list
