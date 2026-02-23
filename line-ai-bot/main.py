@@ -1,44 +1,50 @@
 import os
 import random
-import time
+import logging
+import google.generativeai as genai
+
 from flask import request
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import LineBotApiError, InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 from pytz import timezone
 from datetime import datetime
-import google.generativeai as genai
 
-# 環境変数の取得
+# --------------------
+# logging 設定
+# --------------------
+logging.basicConfig(level=logging.INFO)
+
+# --------------------
+# 環境変数
+# --------------------
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 USER_ID = os.getenv("USER_ID")
 
-# 環境変数が正しく設定されているか確認
 if not LINE_CHANNEL_SECRET or not LINE_CHANNEL_ACCESS_TOKEN or not GEMINI_API_KEY:
     raise ValueError("環境変数が正しく設定されていません")
 
-# Gemini API 設定
+# --------------------
+# Gemini
+# --------------------
 genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("models/gemini-2.5-flash")
 
-# 利用可能なモデル一覧
-# available_models = [m.name for m in genai.list_models()]
-# print(available_models)
-
-# 使用するモデルを選択
-model_name = "models/gemini-2.5-flash"
-
-model = genai.GenerativeModel(model_name)
-
+# --------------------
+# LINE
+# --------------------
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# ユーザーごとの会話履歴を保存する辞書（簡易的な実装のため、データベースを使わない）
+# 会話履歴（簡易）
 session_data = {}
 
+# ==================================================
+# LINE Webhook
+# ==================================================
 def webhook(request):
-    """Cloud Functions で動作する LINE Webhook"""
     if request.method != "POST":
         return "Only POST requests are allowed", 405
 
@@ -48,121 +54,118 @@ def webhook(request):
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
+        logging.warning("Invalid signature")
         return "Invalid signature", 400
     except LineBotApiError as e:
-        print(f"LINE API Error: {e}")
+        logging.error(f"LINE API Error: {e}")
         return "LINE API error", 500
-    
+
     return "OK", 200
+
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
+    user_id = event.source.user_id
+    user_message = event.message.text
 
-    # プロンプトを読み込み
+    logging.info(f"Received message from {user_id}: {user_message}")
+
     try:
         with open("prompt.txt", encoding="utf-8") as f:
             base_prompt = f.read()
     except Exception as e:
-        print(f"プロンプト読み込み失敗: {e}")
-        return "Failed to read prompt", 500
+        logging.error(f"Prompt read failed: {e}")
+        return
 
-    user_id = event.source.user_id
-    user_message = event.message.text
-
-    # ユーザーごとの履歴を取得または初期化
     if user_id not in session_data:
         session_data[user_id] = []
 
-    # 履歴の最大数を2回分に制限
     if len(session_data[user_id]) >= 2:
-        session_data[user_id].pop(0)  # 最も古い会話を削除
+        session_data[user_id].pop(0)
 
-    # 新しいメッセージを履歴に追加
     session_data[user_id].append(f"ユーザー: {user_message}")
-
-    # Gemini API に送るメッセージを作成（過去2回分の会話を含める）
     conversation_history = "\n".join(session_data[user_id])
 
     try:
         response = model.generate_content(
             f"""{base_prompt}
-                わたしは夫婦仲が悪く悩んでいます。
                 文章は90文字以内でお願いします。
 
                 【会話履歴】
                 {conversation_history}
-                
+
                 【新しいメッセージ】
-                メッセージ: {user_message}
+                {user_message}
             """
         )
-
-        # 応答が正しく生成されたかチェック
-        ai_reply = response.text if hasattr(response, "text") else "エラーが発生しました"
-
+        ai_reply = response.text
     except Exception as e:
-        print(f"Gemini API Error: {e}")
+        logging.error(f"Gemini API Error: {e}")
         ai_reply = "ちょっと今忙しいからあとでねー"
 
-    # AIの返信を履歴に追加
     session_data[user_id].append(f"さくら: {ai_reply}")
 
-    # LINE に返信
     try:
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text=ai_reply)
         )
     except LineBotApiError as e:
-        print(f"LINE メッセージ送信エラー: {e}")
+        logging.error(f"Reply failed: {e}")
 
-# Cloud Functions のエントリポイント（Cloud Scheduler 用）
+# ==================================================
+# Cloud Scheduler 用（抽選だけ）
+# ==================================================
 def send_random_message(request):
-
-    # 現在の日本時間を取得
-    now = datetime.now()
-    japan_time = now.astimezone(timezone('Asia/Tokyo'))
-
-    # 抽選ロジック
+    now = datetime.now(timezone("Asia/Tokyo"))
+    hour = now.hour
     chance = random.randint(1, 100)
-    if japan_time.hour in [9, 12, 15, 19, 20]:
+
+    logging.info(f"[Scheduler] time={now}, chance={chance}")
+
+    # ---- 抽選ルール ----
+    if hour in [9, 12, 15, 19, 20]:
         if chance > 80:
-            return "Not sending message this time", 200
-    elif japan_time.hour in range(0, 8):
-        return "Not sending message this time", 200
+            logging.info("Skip: daytime rule")
+            return "skip", 200
+    elif hour in range(0, 8):
+        logging.info("Skip: midnight rule")
+        return "skip", 200
     else:
         if chance > 10:
-            return "Not sending message this time", 200
+            logging.info("Skip: normal rule")
+            return "skip", 200
 
-    # ランダムな待機時間（0〜59分）
-    sleep_seconds = random.randint(0, 59) * 60
-    time.sleep(sleep_seconds)
+    logging.info("Passed lottery → send message now")
+    return send_message_now(request)
 
-    # プロンプトを読み込み
+# ==================================================
+# 実送信
+# ==================================================
+def send_message_now(request):
     try:
         with open("prompt.txt", encoding="utf-8") as f:
             base_prompt = f.read()
     except Exception as e:
-        print(f"プロンプト読み込み失敗: {e}")
-        return "Failed to read prompt", 500
+        logging.error(f"Prompt read failed: {e}")
+        return "prompt error", 200
 
-    # Gemini へ送信（架空の会話履歴 or なし）
     try:
         response = model.generate_content(
             f"""{base_prompt}
-           {japan_time.strftime('%Y年%m月%d日 %H時%M分')}ごろの会話をイメージして返事してください。
-           文章は40文字以内でお願いします。
-"""
+                今の気分で一言送ってください。
+                40文字以内。
+            """
         )
-        message = response.text if hasattr(response, "text") else "……なに？特に用はないけど。"
+        message = response.text
     except Exception as e:
-        print(f"Gemini API Error: {e}")
+        logging.error(f"Gemini error: {e}")
         message = "ちょっと今忙しいからあとでねー"
 
-    # LINE に送信
     try:
         line_bot_api.push_message(USER_ID, TextSendMessage(text=message))
-        return "Message sent!", 200
+        logging.info("LINE push message sent")
     except Exception as e:
-        print(f"LINE API Error: {e}")
-        return "Failed to send message", 500
+        logging.error(f"LINE push failed: {e}")
+
+    return "ok", 200
