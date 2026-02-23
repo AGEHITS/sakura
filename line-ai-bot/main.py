@@ -13,7 +13,7 @@ from datetime import datetime
 # --------------------
 # logging 設定
 # --------------------
-logging.basicConfig(level=logging.INFO)
+logging.getLogger().setLevel(logging.INFO)
 
 # --------------------
 # 環境変数
