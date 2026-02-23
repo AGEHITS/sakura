@@ -137,7 +137,7 @@ def send_random_message(request):
             return "skip", 200
 
     logging.info("Passed lottery → send message now")
-    return send_message_now(request)
+    return send_message_task(request)
 
 # ==================================================
 # 実送信
