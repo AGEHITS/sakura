@@ -142,7 +142,7 @@ def send_random_message(request):
 # ==================================================
 # 実送信
 # ==================================================
-def send_message_now(request):
+def send_message_task(request):
     try:
         with open("prompt.txt", encoding="utf-8") as f:
             base_prompt = f.read()
