@@ -125,7 +125,7 @@ gcloud functions deploy line_webhook \
     --region asia-northeast1 \
     --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc
 
-# send_random_message（AIから送信判断）
+# send_random_message
 gcloud functions deploy send_random_message \
     --gen2 \
     --runtime python39 \
@@ -138,8 +138,7 @@ gcloud functions deploy send_random_message \
     --region asia-northeast1 \
     --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc,USER_ID=dddddd
 
-# send_message_task（AIから送信実行）
-# ※send_random_messageから呼び出し
+# send_message_task
 gcloud functions deploy send_message_task \
     --gen2 \
     --runtime python39 \
