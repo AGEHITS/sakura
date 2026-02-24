@@ -3,5 +3,6 @@ flask
 requests
 google-cloud-secret-manager
 google-generativeai
-gunicorn
+google-cloud-tasks
 line-bot-sdk
+pytz
