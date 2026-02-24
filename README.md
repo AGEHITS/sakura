@@ -10,7 +10,7 @@ LINEでメッセージを送るとAIが返信してくれる仕組みの作成
 | 1.0 | 初期開発 |
 | 1.1 | 仕様追加（過去2往復分の会話を踏まえて返信） |
 | 1.2 | 仕様追加（AI側からLINE送信） |
-
+| 1.3 | 仕様変更（gcloud tasksの導入（AI側からのLIINE送信部分）） |
 
 ## 技術スタック
 - Python
@@ -32,7 +32,8 @@ LINEでメッセージを送るとAIが返信してくれる仕組みの作成
 | 機能名 | 実行契機 | 説明 |
 | ---- | ---- | ---- |
 | line_webhook | こちらからのLINE送信時 | LINE返信機能 |
-| send_random_message | Cloud Scheduler（毎時） | LINE送信判定機能（送信要否を抽選し、Cloud Tasksにn分後に送信依頼 |
+| send_random_message | Cloud Scheduler（毎時） | LINE送信判定機能（送信要否を抽選し、enqueue_send_messageを実行する機能） |
+| enqueue_send_message | send_random_message | Cloud Tasksにn分後にsend_message_taskを実行するタスクを登録する機能 |
 | send_message_task | Cloud Tasks | LINE送信機能 |
 
 ## 開発ステップ
