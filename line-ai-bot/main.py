@@ -9,6 +9,8 @@ from linebot.exceptions import LineBotApiError, InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
 from pytz import timezone
 from datetime import datetime
+from google.cloud import tasks_v2
+from google.protobuf import timestamp_pb2
 
 # --------------------
 # logging 設定
@@ -136,8 +138,42 @@ def send_random_message(request):
             logging.info("Skip: normal rule")
             return "skip", 200
 
-    logging.info("Passed lottery → send message now")
-    return send_message_task(request)
+    delay_minutes = random.randint(0, 59)
+    delay_seconds = delay_minutes * 60
+
+    logging.info(f"Passed lottery → enqueue task (delay {delay_minutes} min)")
+    enqueue_send_message(delay_seconds)
+    return "enqueued", 200
+
+# ==================================================
+# Cloud Tasks Queueへの追加
+# ==================================================
+def enqueue_send_message(delay_seconds: int):
+    client = tasks_v2.CloudTasksClient()
+
+    project = os.environ["GCP_PROJECT"]
+    location = "asia-northeast1"
+    queue = "line-message-queue"
+
+    parent = client.queue_path(project, location, queue)
+
+    task = {
+        "http_request": {
+            "http_method": tasks_v2.HttpMethod.POST,
+            "url": os.environ["TASK_TARGET_URL"],
+            "headers": {
+                "Content-Type": "application/json"
+            },
+        }
+    }
+
+    if delay_seconds > 0:
+        schedule_time = timestamp_pb2.Timestamp()
+        schedule_time.FromSeconds(int(datetime.utcnow().timestamp()) + delay_seconds)
+        task["schedule_time"] = schedule_time
+
+    response = client.create_task(parent=parent, task=task)
+    logging.info(f"Task created: {response.name}, delay={delay_seconds}s")
 
 # ==================================================
 # 実送信
