@@ -123,7 +123,7 @@ gcloud functions deploy line_webhook \
     --memory 256MB \
     --timeout 60s \
     --region asia-northeast1 \
-    --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc
+    --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=cccc,USER_ID=dddddd,TASK_TARGET_URL=eee,PROJECT_ID=fffffffff
 
 # send_random_message
 gcloud functions deploy send_random_message \
@@ -136,7 +136,7 @@ gcloud functions deploy send_random_message \
     --memory 256MB \
     --timeout=3600 \
     --region asia-northeast1 \
-    --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc,USER_ID=dddddd
+    --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=cccc,USER_ID=dddddd,TASK_TARGET_URL=eee,PROJECT_ID=fffffffff
 
 # send_message_task
 gcloud functions deploy send_message_task \
@@ -149,15 +149,12 @@ gcloud functions deploy send_message_task \
     --memory 256MB \
     --timeout=3600 \
     --region asia-northeast1 \
-    --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=ccccc,USER_ID=dddddd
+    --set-env-vars LINE_CHANNEL_SECRET=aaaaa,LINE_CHANNEL_ACCESS_TOKEN=bbbbb,GEMINI_API_KEY=cccc,USER_ID=dddddd,TASK_TARGET_URL=eee,PROJECT_ID=fffffffff
 
 # Cloud Tasks のキュー作成（初回のみ）
 ## キュー作成
 gcloud tasks queues create line-message-queue \
   --location=asia-northeast1
-## 環境変数の設定
-TASK_QUEUE=projects/winged-will-455109-k9/locations/asia-northeast1/queues/line-message-queue
-TASK_TARGET_URL=https://asia-northeast1-winged-will-455109-k9.cloudfunctions.net/send_message_task
 
 # スケジュール登録（初回のみ）
 ## スケジュール登録
