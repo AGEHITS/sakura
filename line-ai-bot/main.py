@@ -3,6 +3,7 @@ import random
 import logging
 import google.generativeai as genai
 
+from flask import request
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import LineBotApiError, InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
@@ -74,7 +75,7 @@ def handle_message(event):
             base_prompt = f.read()
     except Exception as e:
         logging.error(f"Prompt read failed: {e}")
-        return  # ← LINE SDK の callback では return 値は使われない
+        return
 
     if user_id not in session_data:
         session_data[user_id] = []
@@ -88,14 +89,14 @@ def handle_message(event):
     try:
         response = model.generate_content(
             f"""{base_prompt}
-文章は90文字以内でお願いします。
+                文章は90文字以内でお願いします。
 
-【会話履歴】
-{conversation_history}
+                【会話履歴】
+                {conversation_history}
 
-【新しいメッセージ】
-{user_message}
-"""
+                【新しいメッセージ】
+                {user_message}
+            """
         )
         ai_reply = response.text
     except Exception as e:
@@ -112,7 +113,6 @@ def handle_message(event):
     except LineBotApiError as e:
         logging.error(f"Reply failed: {e}")
 
-
 # ==================================================
 # Cloud Scheduler 用（抽選だけ）
 # ==================================================
@@ -123,6 +123,7 @@ def send_random_message(request):
 
     logging.info(f"[Scheduler] time={now}, chance={chance}")
 
+    # ---- 抽選ルール ----
     if hour in [9, 12, 15, 19, 20]:
         if chance > 80:
             logging.info("Skip: daytime rule")
@@ -138,13 +139,10 @@ def send_random_message(request):
     logging.info("Passed lottery → send message now")
     return send_message_task(request)
 
-
 # ==================================================
-# 実送信（Cloud Tasks / 直呼び共通）
+# 実送信
 # ==================================================
 def send_message_task(request):
-    logging.info("[Task] send_message_task called")
-
     try:
         with open("prompt.txt", encoding="utf-8") as f:
             base_prompt = f.read()
@@ -155,9 +153,9 @@ def send_message_task(request):
     try:
         response = model.generate_content(
             f"""{base_prompt}
-今の気分で一言送ってください。
-40文字以内。
-"""
+                今の気分で一言送ってください。
+                40文字以内。
+            """
         )
         message = response.text
     except Exception as e:
