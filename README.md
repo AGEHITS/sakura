@@ -197,11 +197,14 @@ gcloud scheduler jobs delete send-line-message --location=asia-northeast1
 gcloud tasks queues list --location=asia-northeast1
 ## タスク一覧の確認
 gcloud tasks list --queue=line-message-queue --location=asia-northeast1
-
-
 ```
 10.その他
 ```
 ## デプロイした関数一覧
 gcloud functions list --v2
+## 手動実行＆確認
+gcloud scheduler jobs run send-line-message --location=asia-northeast1
+gcloud tasks list --queue=line-message-queue --location=asia-northeast1
+gcloud logging read   'resource.type="cloud_run_revision"
+   AND resource.labels.service_name="send-random-message"'   --limit 3   --order desc | grep chance
 ```
