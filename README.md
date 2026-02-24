@@ -193,8 +193,12 @@ gcloud scheduler jobs delete send-line-message --location=asia-northeast1
 ```
 9.gcloud task関連
 ```
-## taskの確認
+## キューの存在確認
 gcloud tasks queues list --location=asia-northeast1
+## タスク一覧の確認
+gcloud tasks list --queue=line-message-queue --location=asia-northeast1
+
+
 ```
 10.その他
 ```
