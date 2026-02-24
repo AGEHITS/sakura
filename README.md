@@ -155,6 +155,9 @@ gcloud functions deploy send_message_task \
 ## キュー作成
 gcloud tasks queues create line-message-queue \
   --location=asia-northeast1
+## 環境変数の設定
+TASK_QUEUE=projects/winged-will-455109-k9/locations/asia-northeast1/queues/line-message-queue
+TASK_TARGET_URL=https://asia-northeast1-winged-will-455109-k9.cloudfunctions.net/send_message_task
 
 # スケジュール登録（初回のみ）
 ## スケジュール登録
@@ -192,4 +195,9 @@ gcloud scheduler jobs delete send-line-message --location=asia-northeast1
 ```
 ## taskの確認
 gcloud tasks queues list --location=asia-northeast1
+```
+10.その他
+```
+## デプロイした関数一覧
+gcloud functions list --v2
 ```
