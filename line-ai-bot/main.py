@@ -1,136 +1,173 @@
 import os
 import random
-import time
 import logging
-from datetime import datetime
+import google.generativeai as genai
+
+from linebot import LineBotApi, WebhookHandler
+from linebot.exceptions import LineBotApiError, InvalidSignatureError
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
 from pytz import timezone
-from flask import request
+from datetime import datetime
 
-logging.basicConfig(level=logging.INFO)
+# --------------------
+# logging 設定
+# --------------------
+logging.getLogger().setLevel(logging.INFO)
 
-# ----------------------------
-# 共通ユーティリティ
-# ----------------------------
-def get_env(name):
-    value = os.getenv(name)
-    if not value:
-        logging.error(f"Missing env var: {name}")
-    return value
+# --------------------
+# 環境変数
+# --------------------
+LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+USER_ID = os.getenv("USER_ID")
 
+if not LINE_CHANNEL_SECRET or not LINE_CHANNEL_ACCESS_TOKEN or not GEMINI_API_KEY:
+    raise ValueError("環境変数が正しく設定されていません")
 
-# =====================================================
+# --------------------
+# Gemini
+# --------------------
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("models/gemini-2.5-flash")
+
+# --------------------
+# LINE
+# --------------------
+line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(LINE_CHANNEL_SECRET)
+
+# 会話履歴（簡易）
+session_data = {}
+
+# ==================================================
 # LINE Webhook
-# =====================================================
+# ==================================================
 def webhook(request):
-    logging.info("=== webhook called ===")
-
     if request.method != "POST":
         return "Only POST requests are allowed", 405
 
+    signature = request.headers.get("X-Line-Signature", "")
+    body = request.get_data(as_text=True)
+
     try:
-        from linebot import WebhookHandler
-        from linebot.exceptions import InvalidSignatureError
-        from linebot import LineBotApi
-
-        handler = WebhookHandler(get_env("LINE_CHANNEL_SECRET"))
-
-        signature = request.headers.get("X-Line-Signature", "")
-        body = request.get_data(as_text=True)
-
         handler.handle(body, signature)
-
-        return "OK", 200
-
     except InvalidSignatureError:
+        logging.warning("Invalid signature")
         return "Invalid signature", 400
-    except Exception:
-        logging.exception("webhook failed")
-        return "ERROR", 500
+    except LineBotApiError as e:
+        logging.error(f"LINE API Error: {e}")
+        return "LINE API error", 500
+
+    return "OK", 200
 
 
-# =====================================================
-# LINE メッセージ処理
-# =====================================================
+@handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
-    logging.info("=== handle_message ===")
+    user_id = event.source.user_id
+    user_message = event.message.text
+
+    logging.info(f"Received message from {user_id}: {user_message}")
 
     try:
-        from linebot import LineBotApi
-        from linebot.models import TextSendMessage
-        import google.generativeai as genai
-
-        LINE_CHANNEL_ACCESS_TOKEN = get_env("LINE_CHANNEL_ACCESS_TOKEN")
-        GEMINI_API_KEY = get_env("GEMINI_API_KEY")
-
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("models/gemini-2.5-flash")
-
-        user_message = event.message.text
-
         with open("prompt.txt", encoding="utf-8") as f:
             base_prompt = f.read()
+    except Exception as e:
+        logging.error(f"Prompt read failed: {e}")
+        return  # ← LINE SDK の callback では return 値は使われない
 
-        response = model.generate_content(
-            f"""
-            {base_prompt}
-            文章は90文字以内でお願いします。
-            ユーザー: {user_message}
-            """
-        )
+    if user_id not in session_data:
+        session_data[user_id] = []
 
-        reply = response.text if hasattr(response, "text") else "……ちょっと調子悪いかも"
+    if len(session_data[user_id]) >= 2:
+        session_data[user_id].pop(0)
 
-        line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text=reply)
-        )
-
-    except Exception:
-        logging.exception("handle_message failed")
-
-
-# =====================================================
-# Cloud Tasks / Scheduler 用
-# =====================================================
-def send_message_task(request):
-    logging.info("=== send_message_task START ===")
+    session_data[user_id].append(f"ユーザー: {user_message}")
+    conversation_history = "\n".join(session_data[user_id])
 
     try:
-        from linebot import LineBotApi
-        from linebot.models import TextSendMessage
-        import google.generativeai as genai
+        response = model.generate_content(
+            f"""{base_prompt}
+文章は90文字以内でお願いします。
 
-        LINE_CHANNEL_ACCESS_TOKEN = get_env("LINE_CHANNEL_ACCESS_TOKEN")
-        GEMINI_API_KEY = get_env("GEMINI_API_KEY")
-        USER_ID = get_env("USER_ID")
+【会話履歴】
+{conversation_history}
 
-        # ランダム遅延（Cloud Tasks 前提）
-        delay = random.randint(30, 300)
-        logging.info(f"sleep {delay}s")
-        time.sleep(delay)
-
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("models/gemini-2.5-flash")
-
-        now = datetime.now(timezone("Asia/Tokyo"))
-        prompt = f"""
-        {now.strftime('%Y年%m月%d日 %H時%M分')}ごろの会話をイメージして
-        40文字以内で返事してください。
-        """
-
-        response = model.generate_content(prompt)
-        message = response.text if hasattr(response, "text") else "……なに？"
-
-        line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
-        line_bot_api.push_message(
-            USER_ID,
-            TextSendMessage(text=message)
+【新しいメッセージ】
+{user_message}
+"""
         )
+        ai_reply = response.text
+    except Exception as e:
+        logging.error(f"Gemini API Error: {e}")
+        ai_reply = "ちょっと今忙しいからあとでねー"
 
-        logging.info("send_message_task OK")
-        return "OK", 200
+    session_data[user_id].append(f"さくら: {ai_reply}")
 
-    except Exception:
-        logging.exception("send_message_task failed")
-        return "ERROR", 500
+    try:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=ai_reply)
+        )
+    except LineBotApiError as e:
+        logging.error(f"Reply failed: {e}")
+
+
+# ==================================================
+# Cloud Scheduler 用（抽選だけ）
+# ==================================================
+def send_random_message(request):
+    now = datetime.now(timezone("Asia/Tokyo"))
+    hour = now.hour
+    chance = random.randint(1, 100)
+
+    logging.info(f"[Scheduler] time={now}, chance={chance}")
+
+    if hour in [9, 12, 15, 19, 20]:
+        if chance > 80:
+            logging.info("Skip: daytime rule")
+            return "skip", 200
+    elif hour in range(0, 8):
+        logging.info("Skip: midnight rule")
+        return "skip", 200
+    else:
+        if chance > 10:
+            logging.info("Skip: normal rule")
+            return "skip", 200
+
+    logging.info("Passed lottery → send message now")
+    return send_message_task(request)
+
+
+# ==================================================
+# 実送信（Cloud Tasks / 直呼び共通）
+# ==================================================
+def send_message_task(request):
+    logging.info("[Task] send_message_task called")
+
+    try:
+        with open("prompt.txt", encoding="utf-8") as f:
+            base_prompt = f.read()
+    except Exception as e:
+        logging.error(f"Prompt read failed: {e}")
+        return "prompt error", 200
+
+    try:
+        response = model.generate_content(
+            f"""{base_prompt}
+今の気分で一言送ってください。
+40文字以内。
+"""
+        )
+        message = response.text
+    except Exception as e:
+        logging.error(f"Gemini error: {e}")
+        message = "ちょっと今忙しいからあとでねー"
+
+    try:
+        line_bot_api.push_message(USER_ID, TextSendMessage(text=message))
+        logging.info("LINE push message sent")
+    except Exception as e:
+        logging.error(f"LINE push failed: {e}")
+
+    return "ok", 200
