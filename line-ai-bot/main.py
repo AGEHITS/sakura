@@ -147,9 +147,12 @@ def enqueue_send_message(delay_seconds: int):
     from google.cloud import tasks_v2
     from google.protobuf import timestamp_pb2
 
-    project = os.environ["GOOGLE_CLOUD_PROJECT"]
     location = "asia-northeast1"
     queue = "line-message-queue"
+
+    project = os.environ.get("PROJECT_ID")
+    if not project:
+        raise RuntimeError("PROJECT_ID is not set")
 
     task_url = os.getenv("TASK_TARGET_URL")
     if not task_url:
