@@ -121,14 +121,14 @@ def send_random_message(request):
 
     # ---- 抽選ルール ----
     if hour in [9, 12, 15, 19, 20]:
-        if chance > 80:
+        if chance > 25:
             logging.info("Skip: daytime rule")
             return "skip", 200
     elif hour in range(0, 8):
         logging.info("Skip: midnight rule")
         return "skip", 200
     else:
-        if chance > 10:
+        if chance > 5:
             logging.info("Skip: normal rule")
             return "skip", 200
 
